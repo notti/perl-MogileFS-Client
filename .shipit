@@ -1,6 +1,5 @@
 # auto-generated shipit config file.
 steps = FindVersion, ChangeVersion, CheckChangeLog, DistTest, Commit, Tag, MakeDist, UploadCPAN
 
-svn.tagpattern = MogileFS-Client-%v
-#AddToSVNDir.dir = /home/lj/cvs/web-danga/dist/MogileFS/client-perl
+git.tagpattern = %v
 
