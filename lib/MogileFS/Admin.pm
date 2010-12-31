@@ -69,14 +69,14 @@ sub get_devices {
 }
 
 # get raw information about fids, for enumerating the dataset
-#   ( $from_fid, $to_fid )
+#   ( $from_fid, $count )
 # returns:
 #   { fid => { hashref with keys: domain, class, devcount, length, key } }
 sub list_fids {
     my MogileFS::Admin $self = shift;
-    my ($fromfid, $tofid) = @_;
+    my ($fromfid, $count) = @_;
 
-    my $res = $self->{backend}->do_request('list_fids', { from => $fromfid, to => $tofid })
+    my $res = $self->{backend}->do_request('list_fids', { from => $fromfid, to => $count })
         or return undef;
 
     my $ret = {};
