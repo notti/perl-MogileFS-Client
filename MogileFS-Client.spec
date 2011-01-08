@@ -1,6 +1,6 @@
 name:      perl-MogileFS-Client
 summary:   perl-MogileFS-Client - Perl client library for accessing MogileFS
-version:   1.13
+version:   1.14
 release:   1%{?dist}
 vendor:    Alan Kasindorf <dormando@rydia.net>
 packager:  Jonathan Steinert <hachi@cpan.org>

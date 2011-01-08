@@ -1,3 +1,15 @@
+1.14 - 2011-01-08
+
+   * support the file_debug command (dormando <dormando@rydia.net>)
+
+   * file_info command for fetching file metadata (dormando <dormando@rydia.net>)
+
+   * update some variables (dormando <dormando@rydia.net>)
+
+   * Update specfile version (Jonathan Steinert <hachi@sixapart.com>)
+
+   * Ignore INSTALL_BASE during rpm building. (Jonathan Steinert <hachi@sixapart.com>)
+
 1.13 - 2010-09-28
 
         * rebalance admin commands
