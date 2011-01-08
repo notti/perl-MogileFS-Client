@@ -689,6 +689,33 @@ sub rename {
     return 1;
 }
 
+=head2 file_debug
+
+    my $info_gob = $mogc->file_debug(fid => $fid);
+    ... or ...
+    my $info_gob = $mogc->file_debug(key => $key);
+
+Thoroughly search for any database notes about a particular fid. Searchable by
+raw fidid, or by domain and key. B<Use sparingly>. Command hits the master
+database numerous times, and if you're using it in production something is
+likely very wrong.
+
+To be used with troubleshooting broken/odd files and errors from mogilefsd.
+
+=cut
+
+sub file_debug {
+    my MogileFS::Client $self = shift;
+    my %opts = @_;
+    $opts{domain} = $self->{domain} unless exists $opts{domain};
+
+    my $res = $self->{backend}->do_request
+        ("file_debug", {
+            %opts,
+        }) or return undef;
+    return $res;
+}
+
 =head2 file_info
 
     my $fid = $mogc->file_info($key, { devices => 0 });
