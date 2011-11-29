@@ -116,6 +116,7 @@ sub get_domains {
                 $res->{"domain${i}class${_}name"} =>
                     { mindevcount => $res->{"domain${i}class${_}mindevcount"},
                       replpolicy  => $res->{"domain${i}class${_}replpolicy"} || '',
+                      hashtype => $res->{"domain${i}class${_}hashtype"} || '',
                     }
             } (1..$res->{"domain${i}classes"})
         };
