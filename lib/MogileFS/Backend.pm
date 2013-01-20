@@ -1,6 +1,7 @@
 package MogileFS::Backend;
 
 use strict;
+use warnings;
 no strict 'refs';
 
 use Carp;
@@ -25,21 +26,26 @@ use vars qw($FLAG_NOSIGNAL $PROTO_TCP);
 eval { $FLAG_NOSIGNAL = MSG_NOSIGNAL; };
 
 sub new {
-    my MogileFS::Backend $self = shift;
-    $self = fields::new($self) unless ref $self;
+    my $self = shift;
+
+    my $subclass = "MogileFS::Backend::Legacy";
+    unless (eval "use $subclass; 1") {
+        die "Error loading $subclass: $@\n";
+    }
+    $self = fields::new($subclass) unless ref $self;
 
     return $self->_init(@_);
 }
 
 sub reload {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     return undef unless $self;
 
     return $self->_init(@_);
 }
 
 sub _init {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
 
     my %args = @_;
 
@@ -65,7 +71,7 @@ sub _init {
 }
 
 sub run_hook {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     my $hookname = shift || return;
 
     my $hook = $self->{hooks}->{$hookname};
@@ -77,7 +83,7 @@ sub run_hook {
 }
 
 sub add_hook {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     my $hookname = shift || return;
 
     if (@_) {
@@ -88,7 +94,7 @@ sub add_hook {
 }
 
 sub set_pref_ip {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     $self->{pref_ip} = shift;
     $self->{pref_ip} = undef
         unless $self->{pref_ip} &&
@@ -109,8 +115,18 @@ sub _wait_for_readability {
     return $nfound ? 1 : 0;
 }
 
+sub prepare_req {
+    my $self = shift;
+    die "not implemented\n";
+}
+
+sub parse_line {
+    my $self = shift;
+    die "not implemented\n";
+}
+
 sub do_request {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     my ($cmd, $args) = @_;
 
     _fail("invalid arguments to do_request")
@@ -119,8 +135,7 @@ sub do_request {
     local $SIG{'PIPE'} = "IGNORE" unless $FLAG_NOSIGNAL;
 
     my $sock = $self->{sock_cache};
-    my $argstr = _encode_url_string(%$args);
-    my $req = "$cmd $argstr\r\n";
+    my $req = $self->prepare_req(@_);
     my $reqlen = length($req);
     my $rv = 0;
 
@@ -179,20 +194,8 @@ sub do_request {
         return _fail("socket closed on read");
     }
 
-    # ERR <errcode> <errstr>
-    if ($line =~ /^ERR\s+(\w+)\s*(\S*)/) {
-        $self->{'lasterr'} = $1;
-        $self->{'lasterrstr'} = $2 ? _unescape_url_string($2) : undef;
-        _debug("LASTERR: $1 $2");
-        return undef;
-    }
-
-    # OK <arg_len> <response>
-    if ($line =~ /^OK\s+\d*\s*(\S*)/) {
-        my $args = _decode_url_string($1);
-        _debug("RETURN_VARS: ", $args);
-        return $args;
-    }
+    my $ret = eval { $self->parse_line($line) };
+    return $ret unless $@;
 
     undef $self->{sock_cache};
     _fail("invalid response from server: [$line]");
@@ -200,13 +203,13 @@ sub do_request {
 }
 
 sub errstr {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     return unless $self->{'lasterr'};
     return join(" ", $self->{'lasterr'}, $self->{'lasterrstr'});
 }
 
 sub errcode {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     return $self->{lasterr};
 }
 
@@ -216,7 +219,7 @@ sub last_tracker {
 }
 
 sub err {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     return $self->{lasterr} ? 1 : 0;
 }
 
@@ -264,7 +267,7 @@ sub _connect_sock { # sock, sin, timeout
 }
 
 sub _sock_to_host { # (host)
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     my $host = shift;
 
     # create a socket and try to do a non-blocking connect
@@ -305,7 +308,7 @@ sub _sock_to_host { # (host)
 # return a new mogilefsd socket, trying different hosts until one is found,
 # or undef if they're all dead
 sub _get_sock {
-    my MogileFS::Backend $self = shift;
+    my $self = shift;
     return undef unless $self;
 
     my $size = scalar(@{$self->{hosts}});
@@ -331,48 +334,4 @@ sub _get_sock {
     return $sock;
 }
 
-sub _escape_url_string {
-    my $str = shift;
-    $str =~ s/([^a-zA-Z0-9_\,\-.\/\\\: ])/uc sprintf("%%%02x",ord($1))/eg;
-    $str =~ tr/ /+/;
-    return $str;
-}
 
-sub _unescape_url_string {
-    my $str = shift;
-    $str =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-    $str =~ tr/+/ /;
-    return $str;
-}
-
-sub _encode_url_string {
-    my %args = @_;
-    return "" unless %args;
-    return join("&",
-                map { _escape_url_string($_) . '=' .
-                      _escape_url_string($args{$_}) }
-                grep { defined $args{$_} } keys %args
-                );
-}
-
-sub _decode_url_string {
-    my $arg = shift;
-    my $buffer = ref $arg ? $arg : \$arg;
-    my $hashref = {};  # output hash
-
-    my $pair;
-    my @pairs = split(/&/, $$buffer);
-    my ($name, $value);
-    foreach $pair (@pairs) {
-        ($name, $value) = split(/=/, $pair);
-        $value =~ tr/+/ /;
-        $value =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-        $name =~ tr/+/ /;
-        $name =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-        $hashref->{$name} .= $hashref->{$name} ? "\0$value" : $value;
-    }
-
-    return $hashref;
-}
-
-1;
